@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import {
-  PRODUCTS_STORAGE_KEY,
   readCategories,
   readProducts,
   type Product,
@@ -16,30 +15,16 @@ export function Catalog() {
   const [categories, setCategories] = useState<string[]>(['Todo'])
   const [selected, setSelected] = useState<Product | null>(null)
   const [catalogProducts, setCatalogProducts] = useState<Product[]>([])
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    const syncProducts = () => setCatalogProducts(readProducts())
-    const syncCategories = () => setCategories(['Todo', ...readCategories()])
-
-    syncProducts()
-    syncCategories()
-
-    const handleStorageUpdate = (event: Event) => {
-      if (event instanceof StorageEvent && event.key !== PRODUCTS_STORAGE_KEY) {
-        return
-      }
-      syncProducts()
+    async function load() {
+      const [products, cats] = await Promise.all([readProducts(), readCategories()])
+      setCatalogProducts(products)
+      setCategories(['Todo', ...cats])
+      setIsLoading(false)
     }
-
-    window.addEventListener('ruina-products-updated', handleStorageUpdate)
-    window.addEventListener('ruina-categories-updated', syncCategories)
-    window.addEventListener('storage', handleStorageUpdate)
-
-    return () => {
-      window.removeEventListener('ruina-products-updated', handleStorageUpdate)
-      window.removeEventListener('ruina-categories-updated', syncCategories)
-      window.removeEventListener('storage', handleStorageUpdate)
-    }
+    load()
   }, [])
 
   const filtered = useMemo(() => {
@@ -80,11 +65,15 @@ export function Catalog() {
         ))}
       </div>
 
-      <div className="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-        {filtered.map((product) => (
-          <ProductCard key={product.id} product={product} onView={setSelected} />
-        ))}
-      </div>
+      {isLoading ? (
+        <p className="mt-10 text-sm text-muted-foreground">Cargando productos...</p>
+      ) : (
+        <div className="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {filtered.map((product) => (
+            <ProductCard key={product.id} product={product} onView={setSelected} />
+          ))}
+        </div>
+      )}
 
       <ProductDetail product={selected} onClose={() => setSelected(null)} />
     </section>

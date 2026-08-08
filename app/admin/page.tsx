@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { Plus, Trash2, PencilLine, ArrowLeft, Lock, Eye, EyeOff, ImagePlus, BarChart3, ShoppingBag, MonitorPlay } from 'lucide-react'
-import { readCategories, readProducts, writeCategories, writeProducts, type Product } from '@/lib/products'
+import { readCategories, readProducts, saveProduct, deleteProduct, writeCategories, type Product } from '@/lib/products'
 import { defaultSlides, readSlides, writeSlides, type Slide } from '@/lib/content'
 import { defaultSiteContent, readSiteContent, writeSiteContent, type SiteContent } from '@/lib/site-content'
 
@@ -24,24 +24,29 @@ type Metrics = {
   conversions: number
 }
 
-const storageKeys = {
-  metrics: 'ruina-metrics',
-  password: 'ruina-admin-password',
-}
+const defaultMetrics: Metrics = { visits: 128, orders: 14, conversions: 11 }
 
-function readMetrics(): Metrics {
-  if (typeof window === 'undefined') return { visits: 128, orders: 14, conversions: 11 }
+async function readMetrics(): Promise<Metrics> {
   try {
-    const raw = window.localStorage.getItem(storageKeys.metrics)
-    return raw ? (JSON.parse(raw) as Metrics) : { visits: 128, orders: 14, conversions: 11 }
+    const res = await fetch('/api/metrics', { cache: 'no-store' })
+    if (!res.ok) return defaultMetrics
+    const data = await res.json()
+    return { visits: data.visits, orders: data.orders, conversions: data.conversions }
   } catch {
-    return { visits: 128, orders: 14, conversions: 11 }
+    return defaultMetrics
   }
 }
 
-function writeMetrics(nextMetrics: Metrics) {
-  if (typeof window === 'undefined') return
-  window.localStorage.setItem(storageKeys.metrics, JSON.stringify(nextMetrics))
+async function writeMetrics(nextMetrics: Metrics): Promise<void> {
+  await fetch('/api/metrics', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(nextMetrics),
+  })
+}
+
+const storageKeys = {
+  password: 'ruina-admin-password',
 }
 
 export default function AdminPage() {
@@ -53,7 +58,7 @@ export default function AdminPage() {
   const [featuredInput, setFeaturedInput] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [slides, setSlides] = useState<Slide[]>(defaultSlides)
-  const [metrics, setMetrics] = useState<Metrics>({ visits: 128, orders: 14, conversions: 11 })
+  const [metrics, setMetrics] = useState<Metrics>(defaultMetrics)
   const [categories, setCategories] = useState<string[]>([])
   const [categoryDraft, setCategoryDraft] = useState('')
   const [editingCategoryIndex, setEditingCategoryIndex] = useState<number | null>(null)
@@ -65,16 +70,25 @@ export default function AdminPage() {
   const [hasCheckedAuth, setHasCheckedAuth] = useState(false)
   const [loginError, setLoginError] = useState('')
   const [siteContent, setSiteContent] = useState<SiteContent>(defaultSiteContent)
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    setProducts(readProducts())
-    setSlides(readSlides())
-    setMetrics(readMetrics())
-    setSiteContent(readSiteContent())
-    setCategories(readCategories())
-
-    const syncMetrics = () => setMetrics(readMetrics())
-    window.addEventListener('ruina-metrics-updated', syncMetrics)
+    async function loadAll() {
+      const [p, s, m, c, cat] = await Promise.all([
+        readProducts(),
+        readSlides(),
+        readMetrics(),
+        readSiteContent(),
+        readCategories(),
+      ])
+      setProducts(p)
+      setSlides(s)
+      setMetrics(m)
+      setSiteContent(c)
+      setCategories(cat)
+      setIsLoading(false)
+    }
+    loadAll()
 
     const savedPassword = window.localStorage.getItem(storageKeys.password)
     if (savedPassword) {
@@ -82,7 +96,6 @@ export default function AdminPage() {
       setIsAuthenticated(true)
     }
     setHasCheckedAuth(true)
-    return () => window.removeEventListener('ruina-metrics-updated', syncMetrics)
   }, [])
 
   const handleLogin = (event: React.FormEvent) => {
@@ -94,7 +107,6 @@ export default function AdminPage() {
       setIsAuthenticated(true)
       return
     }
-
     setLoginError('Contraseña incorrecta. Intenta de nuevo.')
   }
 
@@ -102,11 +114,9 @@ export default function AdminPage() {
     const file = event.target.files?.[0]
     if (!file) return
     setUploadingImage(true)
-
     const reader = new FileReader()
     reader.onload = () => {
-      const result = reader.result as string
-      setDraft({ ...draft, image: result })
+      setDraft((d) => ({ ...d, image: reader.result as string }))
       setUploadingImage(false)
     }
     reader.readAsDataURL(file)
@@ -116,25 +126,31 @@ export default function AdminPage() {
     const file = event.target.files?.[0]
     if (!file) return
     setUploadingCarouselImage(true)
-
     const reader = new FileReader()
-    reader.onload = () => {
+    reader.onload = async () => {
       const nextSlides = [...slides]
-      nextSlides[index].image = reader.result as string
+      nextSlides[index] = { ...nextSlides[index], image: reader.result as string }
       setSlides(nextSlides)
-      writeSlides(nextSlides)
+      await writeSlides(nextSlides)
       setUploadingCarouselImage(false)
     }
     reader.readAsDataURL(file)
   }
 
-  const handleRemoveSlide = (index: number) => {
+  const handleRemoveSlide = async (index: number) => {
     const nextSlides = slides.filter((_, slideIndex) => slideIndex !== index)
     setSlides(nextSlides)
-    writeSlides(nextSlides)
+    await writeSlides(nextSlides)
   }
 
-  const handleSaveSiteContent = (event: React.FormEvent) => {
+  const updateSlideField = async (index: number, field: keyof Slide, value: string) => {
+    const nextSlides = [...slides]
+    nextSlides[index] = { ...nextSlides[index], [field]: value }
+    setSlides(nextSlides)
+    await writeSlides(nextSlides)
+  }
+
+  const handleSaveSiteContent = async (event: React.FormEvent) => {
     event.preventDefault()
     const nextContent: SiteContent = {
       aboutTitle: siteContent.aboutTitle.trim() || defaultSiteContent.aboutTitle,
@@ -144,26 +160,22 @@ export default function AdminPage() {
       contactWhatsapp: siteContent.contactWhatsapp.trim() || defaultSiteContent.contactWhatsapp,
       contactWhatsappMessage: siteContent.contactWhatsappMessage.trim() || defaultSiteContent.contactWhatsappMessage,
     }
-
     setSiteContent(nextContent)
-    writeSiteContent(nextContent)
+    await writeSiteContent(nextContent)
   }
 
-  const handleCategorySubmit = (event: React.FormEvent) => {
+  const handleCategorySubmit = async (event: React.FormEvent) => {
     event.preventDefault()
-
     const trimmedCategory = categoryDraft.trim()
-    if (!trimmedCategory) {
-      return
-    }
+    if (!trimmedCategory) return
 
     const nextCategories = editingCategoryIndex === null
       ? [...categories, trimmedCategory]
       : categories.map((category, index) => (index === editingCategoryIndex ? trimmedCategory : category))
 
-    const normalizedCategories = Array.from(new Set(nextCategories.map((category) => category.trim()).filter(Boolean)))
+    const normalizedCategories = Array.from(new Set(nextCategories.map((c) => c.trim()).filter(Boolean)))
     setCategories(normalizedCategories)
-    writeCategories(normalizedCategories)
+    await writeCategories(normalizedCategories)
     setCategoryDraft('')
     setEditingCategoryIndex(null)
   }
@@ -173,34 +185,30 @@ export default function AdminPage() {
     setEditingCategoryIndex(index)
   }
 
-  const handleDeleteCategory = (index: number) => {
+  const handleDeleteCategory = async (index: number) => {
     const categoryToRemove = categories[index]
-    if (!categoryToRemove) {
-      return
-    }
+    if (!categoryToRemove) return
 
     const nextCategories = categories.filter((_, categoryIndex) => categoryIndex !== index)
-    const normalizedCategories = Array.from(new Set(nextCategories.map((category) => category.trim()).filter(Boolean)))
+    const normalizedCategories = Array.from(new Set(nextCategories.map((c) => c.trim()).filter(Boolean)))
     setCategories(normalizedCategories)
-    writeCategories(normalizedCategories)
+    await writeCategories(normalizedCategories)
 
     const fallbackCategory = normalizedCategories[0] || 'Sin categoría'
     const nextProducts = products.map((product) =>
       product.category === categoryToRemove ? { ...product, category: fallbackCategory } : product,
     )
-
     setProducts(nextProducts)
-    writeProducts(nextProducts)
+    for (const product of nextProducts.filter((p) => p.category === fallbackCategory)) {
+      await saveProduct(product)
+    }
     setCategoryDraft('')
     setEditingCategoryIndex(null)
   }
 
-  const handleSubmit = (event: React.FormEvent) => {
+  const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
-
-    if (!draft.name.trim() || !draft.description.trim()) {
-      return
-    }
+    if (!draft.name.trim() || !draft.description.trim()) return
 
     const normalizedProduct: Product = {
       ...draft,
@@ -213,12 +221,13 @@ export default function AdminPage() {
       featured: featuredInput,
     }
 
+    await saveProduct(normalizedProduct)
+
     const nextProducts = editingId
       ? products.map((item) => (item.id === editingId ? normalizedProduct : item))
       : [normalizedProduct, ...products]
 
     setProducts(nextProducts)
-    writeProducts(nextProducts)
     setDraft(emptyProduct)
     setSizesInput('S')
     setColorsInput('Negro')
@@ -236,10 +245,10 @@ export default function AdminPage() {
     setFeaturedInput(Boolean(product.featured))
   }
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
+    await deleteProduct(id)
     const nextProducts = products.filter((item) => item.id !== id)
     setProducts(nextProducts)
-    writeProducts(nextProducts)
     if (editingId === id) {
       setDraft(emptyProduct)
       setEditingId(null)
@@ -291,6 +300,14 @@ export default function AdminPage() {
             Volver a la página de inicio
           </Link>
         </form>
+      </main>
+    )
+  }
+
+  if (isLoading) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-background text-foreground">
+        <p className="text-sm text-muted-foreground">Cargando panel...</p>
       </main>
     )
   }
@@ -545,10 +562,10 @@ export default function AdminPage() {
             <div className="mb-4 flex items-center justify-between">
               <h2 className="font-sans text-xl font-semibold uppercase">Carrusel</h2>
               <button
-                onClick={() => {
+                onClick={async () => {
                   const nextSlides = [...slides, { image: '/carousel-1.png', eyebrow: 'Nuevo', title: 'Nueva pieza', subtitle: 'Añade una idea para el carrusel' }]
                   setSlides(nextSlides)
-                  writeSlides(nextSlides)
+                  await writeSlides(nextSlides)
                 }}
                 className="flex items-center gap-2 rounded border border-border px-3 py-2 text-sm hover:border-primary hover:text-primary"
               >
@@ -569,12 +586,7 @@ export default function AdminPage() {
                       <label className="mb-1 block text-sm font-semibold">Imagen</label>
                       <input
                         value={slide.image}
-                        onChange={(event) => {
-                          const nextSlides = [...slides]
-                          nextSlides[index].image = event.target.value
-                          setSlides(nextSlides)
-                          writeSlides(nextSlides)
-                        }}
+                        onChange={(event) => updateSlideField(index, 'image', event.target.value)}
                         className="w-full border border-border bg-background px-3 py-2 text-sm"
                       />
                       <label className="mt-2 flex cursor-pointer items-center gap-2 text-sm text-primary">
@@ -587,12 +599,7 @@ export default function AdminPage() {
                       <label className="mb-1 block text-sm font-semibold">Eyebrow</label>
                       <input
                         value={slide.eyebrow}
-                        onChange={(event) => {
-                          const nextSlides = [...slides]
-                          nextSlides[index].eyebrow = event.target.value
-                          setSlides(nextSlides)
-                          writeSlides(nextSlides)
-                        }}
+                        onChange={(event) => updateSlideField(index, 'eyebrow', event.target.value)}
                         className="w-full border border-border bg-background px-3 py-2 text-sm"
                       />
                     </div>
@@ -600,12 +607,7 @@ export default function AdminPage() {
                       <label className="mb-1 block text-sm font-semibold">Título</label>
                       <input
                         value={slide.title}
-                        onChange={(event) => {
-                          const nextSlides = [...slides]
-                          nextSlides[index].title = event.target.value
-                          setSlides(nextSlides)
-                          writeSlides(nextSlides)
-                        }}
+                        onChange={(event) => updateSlideField(index, 'title', event.target.value)}
                         className="w-full border border-border bg-background px-3 py-2 text-sm"
                       />
                     </div>
@@ -613,12 +615,7 @@ export default function AdminPage() {
                       <label className="mb-1 block text-sm font-semibold">Subtítulo</label>
                       <input
                         value={slide.subtitle}
-                        onChange={(event) => {
-                          const nextSlides = [...slides]
-                          nextSlides[index].subtitle = event.target.value
-                          setSlides(nextSlides)
-                          writeSlides(nextSlides)
-                        }}
+                        onChange={(event) => updateSlideField(index, 'subtitle', event.target.value)}
                         className="w-full border border-border bg-background px-3 py-2 text-sm"
                       />
                     </div>
@@ -630,17 +627,17 @@ export default function AdminPage() {
 
           <div className="rounded border border-border bg-card p-6">
             <h2 className="font-sans text-xl font-semibold uppercase">Métricas y pedidos</h2>
-            <p className="mt-2 text-sm text-muted-foreground">Estas cifras se sincronizan con la tienda para reflejar visitas y compras reales del navegador.</p>
+            <p className="mt-2 text-sm text-muted-foreground">Estas cifras se guardan en la base de datos y se ven igual desde cualquier dispositivo.</p>
             <div className="mt-4 space-y-3">
               <div>
                 <label className="mb-1 block text-sm font-semibold">Visitas</label>
                 <input
                   type="number"
                   value={metrics.visits}
-                  onChange={(event) => {
+                  onChange={async (event) => {
                     const nextMetrics = { ...metrics, visits: Number(event.target.value) }
                     setMetrics(nextMetrics)
-                    writeMetrics(nextMetrics)
+                    await writeMetrics(nextMetrics)
                   }}
                   className="w-full border border-border bg-background px-3 py-2 text-sm"
                 />
@@ -650,10 +647,10 @@ export default function AdminPage() {
                 <input
                   type="number"
                   value={metrics.orders}
-                  onChange={(event) => {
+                  onChange={async (event) => {
                     const nextMetrics = { ...metrics, orders: Number(event.target.value) }
                     setMetrics(nextMetrics)
-                    writeMetrics(nextMetrics)
+                    await writeMetrics(nextMetrics)
                   }}
                   className="w-full border border-border bg-background px-3 py-2 text-sm"
                 />
@@ -663,10 +660,10 @@ export default function AdminPage() {
                 <input
                   type="number"
                   value={metrics.conversions}
-                  onChange={(event) => {
+                  onChange={async (event) => {
                     const nextMetrics = { ...metrics, conversions: Number(event.target.value) }
                     setMetrics(nextMetrics)
-                    writeMetrics(nextMetrics)
+                    await writeMetrics(nextMetrics)
                   }}
                   className="w-full border border-border bg-background px-3 py-2 text-sm"
                 />

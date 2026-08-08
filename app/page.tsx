@@ -21,12 +21,21 @@ export default function Page() {
   }, [])
 
   useEffect(() => {
-    if (typeof window === 'undefined') return
-
-    const metrics = JSON.parse(window.localStorage.getItem('ruina-metrics') ?? '{"visits":128,"orders":14,"conversions":11}') as { visits: number; orders: number; conversions: number }
-    const nextMetrics = { ...metrics, visits: metrics.visits + 1 }
-    window.localStorage.setItem('ruina-metrics', JSON.stringify(nextMetrics))
-    window.dispatchEvent(new Event('ruina-metrics-updated'))
+    async function trackVisit() {
+      try {
+        const res = await fetch('/api/metrics', { cache: 'no-store' })
+        if (!res.ok) return
+        const metrics = await res.json()
+        await fetch('/api/metrics', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...metrics, visits: metrics.visits + 1 }),
+        })
+      } catch {
+        // Si falla, simplemente no se cuenta esta visita.
+      }
+    }
+    trackVisit()
   }, [])
 
   return (
