@@ -10,7 +10,7 @@ export type SiteContent = {
 export const SITE_CONTENT_STORAGE_KEY = 'Finex-site-content'
 
 export const defaultSiteContent: SiteContent = {
-  aboutTitle: 'Nacidos de las cenizas de la cultura urbana, FENIX es más que ropa: es actitud.',
+  aboutTitle: 'Nacidos de las cenizas de la cultura urbana, FENIX STORE es más que ropa: es actitud.',
   aboutText:
     'La ropa está en todas partes, pero el estilo solo lo tienen algunos. En FENIX no inventamos la tela; cazamos las mejores piezas de la calle, las unimos y les damos nueva vida. No vendemos marcas, vendemos la combinación exacta para que renazcas con actitud.',
   contactLocation: 'Bogotá, Colombia',
