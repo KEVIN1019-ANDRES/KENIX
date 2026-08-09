@@ -15,9 +15,11 @@ const perks = [
 ]
 
 export default function Page() {
+  const driveUrl = 'https://drive.google.com/drive/folders/1e_-NuFRAVfvz4cNZ6DRXD_Fi8EIvYw2S?usp=sharing'
+
   const shareUrl = useMemo(() => {
-    if (typeof window === 'undefined') return 'https://fenix.com'
-    return window.location.href
+    if (typeof window === 'undefined') return 'https://kenix.vercel.app/#coleccion'
+    return window.location.href 
   }, [])
 
   useEffect(() => {
@@ -44,21 +46,39 @@ export default function Page() {
       <HeroCarousel />
 
       <section className="border-y border-border bg-card">
-        <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-4 md:flex-row md:items-center md:justify-between md:px-6">
-          <p className="font-mono text-xs uppercase tracking-[0.3em] text-muted-foreground">
-            Comparte esta tienda con cualquier cliente: {shareUrl}
-          </p>
-          <button
-            onClick={() => {
-              if (typeof window !== 'undefined') {
-                navigator.clipboard?.writeText(shareUrl)
-                window.alert('Enlace copiado para compartir')
-              }
-            }}
-            className="rounded border border-border px-3 py-2 text-sm font-semibold uppercase tracking-wide text-foreground hover:border-primary hover:text-primary"
-          >
-            Copiar enlace
-          </button>
+        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 md:px-6">
+          {/* Bloque para compartir tienda */}
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <p className="font-mono text-xs uppercase tracking-[0.3em] text-muted-foreground">
+              Comparte esta tienda con cualquier cliente: {shareUrl}
+            </p>
+            <button
+              onClick={() => {
+                if (typeof window !== 'undefined') {
+                  navigator.clipboard?.writeText(shareUrl)
+                  window.alert('Enlace copiado para compartir')
+                }
+              }}
+              className="rounded border border-border px-3 py-2 text-sm font-semibold uppercase tracking-wide text-foreground hover:border-primary hover:text-primary"
+            >
+              Copiar enlace
+            </button>
+          </div>
+
+          {/* Bloque para acceder al Drive */}
+          <div className="flex flex-col gap-3 border-t border-border pt-4 md:flex-row md:items-center md:justify-between">
+            <p className="font-mono text-xs uppercase tracking-[0.3em] text-muted-foreground">
+              Ver catálogo en carpeta de Google Drive
+            </p>
+            <a
+              href="https://drive.google.com/drive/folders/1e_-NuFRAVfvz4cNZ6DRXD_Fi8EIvYw2S?usp=sharing"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block rounded border border-border px-3 py-2 text-center text-sm font-semibold uppercase tracking-wide text-foreground hover:border-primary hover:text-primary"
+            >
+              Abrir carpeta Drive
+            </a>
+          </div>
         </div>
       </section>
 
