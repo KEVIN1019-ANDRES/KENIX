@@ -10,11 +10,11 @@ export function HeroCarousel() {
   const [current, setCurrent] = useState(0)
 
   useEffect(() => {
-    const syncSlides = () => setSlides(readSlides())
-    syncSlides()
-
-    window.addEventListener('ruina-carousel-updated', syncSlides)
-    return () => window.removeEventListener('ruina-carousel-updated', syncSlides)
+    async function load() {
+      const data = await readSlides()
+      setSlides(data)
+    }
+    load()
   }, [])
 
   const next = useCallback(() => setCurrent((c) => (c + 1) % Math.max(slides.length, 1)), [slides.length])
@@ -35,10 +35,18 @@ export function HeroCarousel() {
       {slides.map((slide, i) => (
         <div key={slide.image}
           className={cn('absolute inset-0 transition-opacity duration-700', i === current ? 'opacity-100' : 'pointer-events-none opacity-0',)} aria-hidden={i !== current}>
+          {/* Fondo desenfocado que rellena el espacio, para que la imagen principal no se vea recortada */}
+          <img
+            src={slide.image || "/placeholder.svg"}
+            alt=""
+            aria-hidden="true"
+            className="h-full w-full scale-110 object-cover object-center blur-2xl opacity-40"
+          />
+          {/* Imagen principal, ahora completa (sin recortar) */}
           <img
             src={slide.image || "/placeholder.svg"}
             alt={slide.title || "Imagen de la colección"}
-            className="h-full w-full object-cover"
+            className="absolute inset-0 h-full w-full object-contain object-center"
           />
           <div className="absolute inset-0 bg-gradient-to-r from-background via-background/70 to-transparent" />
 
