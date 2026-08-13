@@ -127,7 +127,7 @@ export function Navbar() {
                   </button>
                 </div>
               ))}
-              <a href="https://wa.me/573000000000?text=Hola%20FENIX%20quiero%20hacer%20mi%20pedido" target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center justify-center gap-2 rounded bg-primary px-4 py-2 text-sm font-semibold uppercase tracking-wide text-primary-foreground">
+              <a href="https://wa.me/573015395359?text=Hola%20FENIX%20quiero%20hacer%20mi%20pedido" target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center justify-center gap-2 rounded bg-primary px-4 py-2 text-sm font-semibold uppercase tracking-wide text-primary-foreground">
                 Finalizar pedido <ArrowRight className="h-4 w-4" />
               </a>
             </div>

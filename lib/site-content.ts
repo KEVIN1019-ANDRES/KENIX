@@ -15,7 +15,7 @@ export const defaultSiteContent: SiteContent = {
     'La ropa está en todas partes, pero el estilo solo lo tienen algunos. En FENIX no inventamos la tela; cazamos las mejores piezas de la calle, las unimos y les damos nueva vida. No vendemos marcas, vendemos la combinación exacta para que renazcas con actitud.',
   contactLocation: 'Bogotá, Colombia',
   contactEmail: 'hola@ruina.co',
-  contactWhatsapp: '+57 300 000 0000',
+  contactWhatsapp: '+57 3015395359',
   contactWhatsappMessage: '¡Hola FINIX ! Quiero más información.',
 }
 
